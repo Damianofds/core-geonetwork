@@ -23,14 +23,21 @@
 
 package org.fao.geonet.guiservices.util;
 
-import jeeves.interfaces.Service;
-import jeeves.resources.dbms.Dbms;
-import jeeves.server.ServiceConfig;
-import jeeves.server.context.ServiceContext;
+import java.util.ArrayList;
+import java.util.LinkedList;
+import java.util.List;
+
 import org.fao.geonet.GeonetContext;
 import org.fao.geonet.constants.Geonet;
 import org.fao.geonet.kernel.setting.SettingManager;
 import org.jdom.Element;
+import org.jdom.xpath.XPath;
+
+import jeeves.constants.Jeeves;
+import jeeves.interfaces.Service;
+import jeeves.resources.dbms.Dbms;
+import jeeves.server.ServiceConfig;
+import jeeves.server.context.ServiceContext;
 
 //=============================================================================
 
@@ -66,8 +73,32 @@ public class Sources implements Service
 		Element nodes = dbms.select("SELECT uuid as siteId, name FROM Sources");
 		nodes.addContent(local);
 
+		// remove from the source list those are in the harvesting/settings table
+		XPath xpathExpression = XPath.newInstance("record");
+		List<Element> sources = (ArrayList<Element>) xpathExpression.selectNodes(nodes);
 
-		return nodes;
+		sm.get("/harvesting", -1).getChildren().size();
+		List filteredSources = new LinkedList<LinkedList>();
+
+		Element harvestingNode = sm.get("/harvesting", -1);
+		xpathExpression = XPath.newInstance("children/node[value/text()='geonetwork']/children/site/children/name/value");
+		List<Element> ee = (ArrayList<Element>) xpathExpression.selectNodes(harvestingNode);
+		List<String> harvestingSources = new LinkedList<String>();
+		for(Element el : ee){
+			harvestingSources.add(el.getText());
+		}
+
+		Element response = new Element(Jeeves.Elem.RESPONSE);
+		String elName = null;
+
+		for(Element el : sources){
+			elName = el.getChild("name").getText();
+			if(!harvestingSources.contains(elName)){
+				response.addContent(el.detach());
+			}
+		}
+
+		return response;
 	}
 }
 
